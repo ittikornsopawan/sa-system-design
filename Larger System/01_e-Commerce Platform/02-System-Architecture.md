@@ -62,6 +62,8 @@
 
 ### Phase 2 — Pilot Tenant & Scalable Architecture
 
+![Pilot Tenant & Scalable Architecture](asset/system-design-2.drawio.png)
+
 Architecture: Hybrid Service Architecture
   - The system begins onboarding **Pilot Tenants**, resulting in increased user activity and higher **system load**.
   - Some **modules** start being extracted into **independent services** to improve scalability.
@@ -70,11 +72,12 @@ Architecture: Hybrid Service Architecture
 
 #### Additional Technology Stack
 
-- API Gateway: Nginx / Gateway Layer
-  - Introduces an **API Gateway** as the main entry point for client requests.
-  - Responsible for **routing requests** to the appropriate **backend services**.
-  - Handles concerns such as **security**, **load balancing**, and **traffic control**.
-  - Provides a clear structure for communication between clients and backend services.
+- API Gateway: Kong Gateway
+  - Uses **Kong Gateway** as the entry point for all **API requests** from clients before forwarding them to backend services.  
+  - Handles important concerns such as **authentication, rate limiting, and API security** at the gateway layer.  
+  - Supports a **plugin-based architecture**, allowing new capabilities to be added without modifying backend services.  
+  - Helps manage **API traffic and communication between clients and services** in a more structured way.  
+  - Designed to scale well and support a transition to **microservices architecture** in the future.
 
 - Backend for Frontend (BFF): GraphQL 
   - Introduces a **GraphQL BFF** layer to provide flexible APIs for different clients such as **Web Applications** and **Mobile Apps**.
@@ -101,6 +104,8 @@ Architecture: Hybrid Service Architecture
 
 ---
 ### Phase 3 — Microservices + Full Multi-Tenant
+
+![Microservices + Full Multi-Tenant](asset/system-design-3.drawio.png)
 
 Architecture: Distributed Microservices Platform
   - The system evolves into a full **Microservices architecture**.
