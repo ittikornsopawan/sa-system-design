@@ -278,51 +278,59 @@ flowchart TB
 %% ================= EDGE =================
 
 subgraph EDGE["Edge Layer"]
-DNS["Amazon Route53 (DNS)"]
-CDN["Amazon CloudFront (CDN)"]
-WAF["AWS WAF"]
+
+DNS["[DNS Routing] Route53"]
+CDN["[Static Content Cache] CloudFront"]
+WAF["[Security Filter] AWS WAF"]
+
 end
 
 %% ================= ENTRY =================
 
 subgraph ENTRY["Traffic Entry"]
-ALB["Application Load Balancer (ALB)"]
-KONG["Kong API Gateway"]
+
+ALB["[Public Load Balancer] ALB"]
+KONG["[API Gateway] Kong"]
+
 end
 
-%% ================= CONTAINER =================
+%% ================= COMPUTE =================
 
-subgraph EKS["Amazon EKS (Kubernetes Cluster)"]
+subgraph EKS["Kubernetes Cluster (EKS)"]
 
 subgraph CORE["Core Transaction Services"]
-USER["User Service"]
-WALLET["Wallet Service"]
-PAYMENT["Payment Service"]
-TX["Transaction Service"]
-LEDGER["Ledger Service"]
-SETTLE["Settlement Service"]
+
+USER["[User Management] User Service"]
+WALLET["[Wallet Balance] Wallet Service"]
+PAYMENT["[Payment Processing] Payment Service"]
+TX["[Transaction Processing] Transaction Service"]
+LEDGER["[Accounting Ledger] Ledger Service"]
+SETTLE["[Settlement Processing] Settlement Service"]
+
 end
 
 subgraph BUSINESS["Business Services"]
-KYC["KYC Service"]
-BILL["Billing Service"]
-FIN["Financial Service"]
-NOTI["Notification Service"]
+
+KYC["[Identity Verification] KYC Service"]
+BILL["[Billing / Fee Calculation] Billing Service"]
+FIN["[Financial Reporting] Financial Service"]
+NOTI["[Notification Delivery] Notification Service"]
+
 end
 
 end
 
 %% ================= SERVERLESS =================
 
-subgraph LAMBDA["AWS Lambda Services"]
+subgraph LAMBDA["Serverless Services (Lambda)"]
 
-DEVICE["Device Service"]
-OTP["OTP Service"]
-RECON["Reconciliation Service"]
-AUDIT["Audit Log Service"]
-RATE["Rate Limiting Service"]
-FRAUD["Fraud Detection Service"]
-TXH["Transaction History Service"]
+DEVICE["[Device Tracking] Device Service"]
+OTP["[OTP Verification] OTP Service"]
+RECON["[Transaction Reconciliation] Reconciliation Service"]
+AUDIT["[Audit Logging] Audit Log Service"]
+RATE["[Rate Limiting] Rate Limiting Service"]
+FRAUD["[Fraud Detection] Fraud Detection Service"]
+TXH["[Transaction History Query] Transaction History Service"]
 
 end
 
@@ -330,15 +338,17 @@ end
 
 subgraph DATA["Data Layer"]
 
-subgraph RDS["Amazon RDS (PostgreSQL)"]
-RDS_CORE["Core Transaction DB"]
-RDS_FIN["Financial DB"]
-RDS_COMP["Compliance DB"]
+subgraph RDS["PostgreSQL (RDS)"]
+
+RDS_CORE["[Core Business Data] Core Database"]
+RDS_FIN["[Financial Records] Financial Database"]
+RDS_COMP["[Compliance / KYC Data] Compliance Database"]
+
 end
 
-REDIS["ElastiCache Redis"]
-DOCDB["Amazon DocumentDB"]
-S3["Amazon S3"]
+REDIS["[In-Memory Cache] Redis"]
+DOCDB["[NoSQL Storage] DocumentDB"]
+S3["[Object Storage] S3"]
 
 end
 
@@ -346,7 +356,7 @@ end
 
 subgraph STREAM["Event Streaming"]
 
-KAFKA["Amazon MSK (Kafka)"]
+KAFKA["[Event Bus] Kafka"]
 
 end
 
@@ -354,7 +364,7 @@ end
 
 subgraph ANALYTICS["Analytics"]
 
-REDSHIFT["Amazon Redshift"]
+REDSHIFT["[Data Warehouse] Redshift"]
 
 end
 
@@ -362,70 +372,70 @@ end
 
 subgraph OBS["Observability"]
 
-PROM["Prometheus"]
-GRAF["Grafana"]
-LOKI["Grafana Loki"]
-JAEGER["Jaeger"]
-OTEL["OpenTelemetry"]
+PROM["[Metrics Collector] Prometheus"]
+GRAF["[Monitoring Dashboard] Grafana"]
+LOKI["[Log Aggregation] Loki"]
+JAEGER["[Distributed Tracing] Jaeger"]
+OTEL["[Telemetry Collector] OpenTelemetry"]
 
 end
 
 %% ================= FLOW =================
 
-DNS --> CDN
-CDN --> WAF
-WAF --> ALB
-ALB --> KONG
+DNS -->|DNS Resolve| CDN
+CDN -->|HTTP Request| WAF
+WAF -->|Filtered Traffic| ALB
+ALB -->|Forward Request| KONG
 
-KONG --> USER
-KONG --> WALLET
-KONG --> PAYMENT
-KONG --> TX
+KONG -->|API Call| USER
+KONG -->|API Call| WALLET
+KONG -->|API Call| PAYMENT
+KONG -->|API Call| TX
 
-USER --> RDS_CORE
-WALLET --> RDS_CORE
-PAYMENT --> RDS_CORE
-TX --> RDS_CORE
+USER -->|User Data| RDS_CORE
+WALLET -->|Wallet Data| RDS_CORE
+PAYMENT -->|Payment Record| RDS_CORE
+TX -->|Transaction Data| RDS_CORE
 
-LEDGER --> RDS_FIN
-SETTLE --> RDS_FIN
-FIN --> RDS_FIN
-BILL --> RDS_FIN
+LEDGER -->|Ledger Entry| RDS_FIN
+SETTLE -->|Settlement Record| RDS_FIN
+FIN -->|Financial Report Data| RDS_FIN
+BILL -->|Billing Data| RDS_FIN
 
-KYC --> RDS_COMP
-AUDIT --> RDS_COMP
+KYC -->|KYC Data| RDS_COMP
+AUDIT -->|Audit Record| RDS_COMP
 
-USER --> REDIS
-WALLET --> REDIS
-TX --> REDIS
-FRAUD --> REDIS
+USER -->|Session Cache| REDIS
+WALLET -->|Balance Cache| REDIS
+TX -->|Idempotency Key| REDIS
+FRAUD -->|Risk Score Cache| REDIS
 
-NOTI --> DOCDB
-TXH --> DOCDB
-AUDIT --> DOCDB
+NOTI -->|Notification Data| DOCDB
+TXH -->|Transaction History| DOCDB
+AUDIT -->|Audit Log| DOCDB
 
-AUDIT --> S3
+AUDIT -->|Archive Logs| S3
 
-TX --> KAFKA
-PAYMENT --> KAFKA
-WALLET --> KAFKA
-SETTLE --> KAFKA
+TX -->|Publish Event| KAFKA
+PAYMENT -->|Publish Event| KAFKA
+WALLET -->|Publish Event| KAFKA
+SETTLE -->|Publish Event| KAFKA
 
-KAFKA --> TXH
-KAFKA --> NOTI
-KAFKA --> FRAUD
+KAFKA -->|Consume Event| TXH
+KAFKA -->|Consume Event| NOTI
+KAFKA -->|Consume Event| FRAUD
 
-KAFKA --> REDSHIFT
+KAFKA -->|Streaming Data| REDSHIFT
 
-USER --> OTEL
-PAYMENT --> OTEL
-TX --> OTEL
+USER -->|Telemetry| OTEL
+PAYMENT -->|Telemetry| OTEL
+TX -->|Telemetry| OTEL
 
-OTEL --> PROM
-PROM --> GRAF
+OTEL -->|Metrics| PROM
+PROM -->|Dashboard| GRAF
 
-OTEL --> JAEGER
-OTEL --> LOKI
+OTEL -->|Trace Data| JAEGER
+OTEL -->|Logs| LOKI
 ```
 
 ### Edge Layer
