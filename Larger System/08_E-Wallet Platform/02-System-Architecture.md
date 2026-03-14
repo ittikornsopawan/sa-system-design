@@ -1,0 +1,276 @@
+# TECHNICAL DESIGN
+
+## ARCHITECTURE SNAPSHOT
+
+- ARCHITECTURE: Microservices
+  - CODE STRUCTURE:
+    - Domain Driven-Design (DDD)
+      - ใช้เพื่อจัดการระบบที่มีหลาย Business Domain โดยแยกแต่ละ Domain ออกเป็น Bounded Context
+      - เพื่อลด Complexity ของ System และป้องกัน Business Logic Overlap (หรือ Cross-domain coupling) ระหว่าง Domain
+      - แต่ละ Domain สามารถถูกพัฒนา ดูแล และ deploy แยกกันได้ ทำให้ทีมสามารถมี Service Owner ของแต่ละ Domain ได้อย่างชัดเจน
+      - DDD Layers
+        - Presentation Layer: Layer สำหรับรับและตอบสนอง request เช่น Web API หรือ gRPC endpoint โดยไม่ควรมี Business Logic
+        - Application Layer: ทำหน้าที่ orchestrate use case ของระบบ เช่น การเรียก Domain Service, Aggregate หรือ Repository เพื่อให้ business flow ทำงานครบ
+        - Domain Layer: เก็บ Business Logic หลักของ Domain เช่น Entity, Value Object, Aggregate และ Domain Service
+        - Infrastructure Layer: Layer ที่เชื่อมต่อกับระบบภายนอก เช่น Database, Message Queue หรือ External Services
+      - DDD Tactical Patterns
+        - Entity: Object ที่มี Identity ชัดเจน และสามารถเปลี่ยนแปลงสถานะ (state) ได้ตลอด lifecycle
+        - Value Object: Object ที่ไม่มี Identity ใช้แทนค่าทาง domain เช่น Money หรือ Email โดยเมื่อค่ามีการเปลี่ยนแปลงจะสร้าง object ใหม่แทน
+        - Aggregate: กลุ่มของ Entity และ Value Object ที่ถูกควบคุมผ่าน Aggregate Root เพื่อบังคับใช้ Business Rules ภายใน domain
+        - Domain Event: Event ที่สะท้อนเหตุการณ์สำคัญใน Business Domain ซึ่งเกิดจากการเปลี่ยนแปลงของ Business Logic
+        - Repository: abstraction layer สำหรับจัดการการอ่านและบันทึกข้อมูลของ Aggregate โดยซ่อนรายละเอียดของ database
+    - CQRS
+      - ใช้เพื่อแยกการทำงานของ Command และ Query ออกจากกัน
+        - Command: ใช้สำหรับการเปลี่ยนแปลงข้อมูล เช่น Create, Update, Delete
+        - Query: ใช้สำหรับการอ่านข้อมูล เช่น Inquiry หรือ Reporting
+      - การแยกนี้ช่วยให้สามารถออกแบบ Read Model และ Write Model ให้เหมาะกับลักษณะการใช้งานของแต่ละฝั่ง
+      - รวมถึงช่วยให้ Business Logic ของฝั่ง Command ซึ่งมักมีความซับซ้อนมากกว่าฝั่ง Query ถูกจัดการอย่างชัดเจนและสามารถทดสอบได้ง่ายขึ้น
+  - PROTOCOL:
+    - gRPC (Service Mesh) - Microservices-to-Microservices
+      - เป็น Strong Contract (schema-first) โดยใช้ Protocol Buffers (protobuf) ทำให้รู้ว่า method ใดสามารถเรียกใช้ได้ และมี request / response model แบบใด
+      - Support Service ที่พัฒนาด้วยคนละภาษาได้ สามารถสื่อสารกันด้วย Protocol Buffers (protobuf)
+      - ใช้ HTTP/2 และ Binary Protocol ทำให้มี latency ต่ำ และ payload ขนาดเล็กกว่า REST (JSON)
+      - เหมาะสำหรับ Microservice-to-Microservice Communication ที่มีการเรียกใช้งานระหว่าง Service อยู่บ่อยครั้ง
+    - RESTful - External API / Client-to-Service
+      - ใช้สำหรับการสื่อสารระหว่าง Client (Web / Mobile / Third-party) กับระบบผ่าน HTTP API
+      - ใช้รูปแบบ Resource-based API เช่น /users, /wallets, /transactions
+      - ใช้ HTTP Methods มาตรฐาน เช่น GET, POST, PUT, PATCH, DELETE เพื่อสื่อความหมายของ operation
+      - ใช้ JSON เป็น payload format เนื่องจากเป็นมาตรฐานที่รองรับได้ดีใน Web และ Mobile ecosystem
+      - เหมาะสำหรับ Public API, Partner Integration และ Client-facing API ผ่าน API Gateway
+      - สามารถทำ Authentication ผ่านมาตรฐาน เช่น OAuth2, JWT หรือ API Key
+      - สามารถทำ Rate Limiting, Request Validation และ API Security ผ่าน API Gateway (Kong)
+  - Fault Tolerance (Code Layer)
+    - ใช้เพื่อเพิ่มความทนทานของระบบเมื่อเกิด network failure หรือ service dependency มีปัญหา
+    - Retry: ใช้สำหรับ retry request เมื่อเกิด transient failure
+    - Circuit Breaker: ป้องกัน cascading failure เมื่อ downstream service ล้ม
+    - Timeout: ป้องกัน request ค้างนานเกินไป
+    - Idempotency: ป้องกันการประมวลผลซ้ำในกรณีที่ request ถูก retry
+- ARCHITECTURE PATTERN
+  - Event Driven Architecture
+    - เมื่อมี Command ที่เปลี่ยนแปลงข้อมูลสำเร็จ ระบบสามารถ publish Domain Event และให้ Service อื่น ๆ subscribe เพื่อทำงานต่อได้
+  - Saga Pattern (Distributed Transaction Management): ใช้ Compensation Action แทน Distributed Transaction
+    - ใช้สำหรับจัดการ Transaction ที่ต้องทำงานข้ามหลาย Microservices
+    - แต่ละ Service จะทำงานเป็นลำดับของ Step
+    - หาก Step ใดล้มเหลว จะใช้ Compensation Action ของแต่ละ Service เพื่อย้อนการทำงานก่อนหน้า แทนการใช้ Distributed Transaction
+    - Example
+      - Payment Service → Create Payment
+      - Wallet Service → Debit Wallet
+      - Ledger Service → Record Ledger (ล้มเหลว)
+      - [Compensation Action]
+      - Wallet Service → Refund Wallet
+      - Payment Service → Cancel Payment
+  - Outbox Pattern: บันทึก event ลง DB ก่อน แล้ว worker ค่อย publish เมื่อ process สำเร็จแล้ว
+  - Idempotent Consumer: ถ้า Event เดิมถูกส่งมาซ้ำ ระบบต้องไม่ประมวลผลซ้ำ (unique constraint)
+- BACKEND API:
+  - User Service
+    - Description: จัดการข้อมูลผู้ใช้งาน เช่น profile, account status และข้อมูลพื้นฐานของผู้ใช้
+    - Stack: GoLang
+    - Database: Postgres (AWS RDS | Primary Node (Write), Read Replica)
+    - Integration:
+      - OTP Service
+      - Device Service
+      - KYC Service
+      - Wallet Service
+      - Notification Service
+  - Device Service
+    - Description: จัดการข้อมูลอุปกรณ์ของผู้ใช้ เช่น device fingerprint และ trusted device
+    - Stack: Python (Lampda)
+    - Database: Redis
+    - Integration:
+      - User Service
+      - Session Service
+      - Fraud Detection Service
+      - OTP Service
+  - OTP Service
+    - Description: สร้างและตรวจสอบ OTP สำหรับ authentication และ transaction verification
+    - Stack: Python (Lampda)
+    - Database: Redis
+    - Integration:
+      - User Service
+      - Device Service
+      - Payment Service
+      - Transaction Service
+  - Token Service
+    - Description: สร้างและตรวจสอบ Access Token สำหรับระบบ authentication
+    - Stack: GoLang
+    - Database: Redis
+    - Integration:
+      - Session Service
+      - User Service
+      - API Gateway
+  - Session Service
+    - Description: จัดการ user session เช่น refresh token, revoke session และ device session tracking
+    - Stack: GoLang
+    - Database:
+      - Redis: Access Token Cache
+      - Postgres: Refresh Token (Revork, Audit, Track Device)
+    - Integration:
+      - Token Service
+      - User Service
+      - Device Service
+      - Fraud Detection Service
+  - Payment Service
+    - Description: จัดการ payment flow เช่น create payment, authorize payment และ cancel payment
+    - Stack: GoLang
+    - Database: Postgres (AWS RDS | Primary Node (Write), Read Replica)
+    - Integration:
+      - Wallet Service
+      - Transaction Service
+      - Fraud Detection Service
+      - Settlement Service
+      - Notification Service
+  - Wallet Service
+    - Description: จัดการ wallet balance เช่น debit, credit และ wallet inquiry
+    - Stack: GoLang
+    - Database:
+      - Postgres (AWS RDS | Primary Node (Write), Read Replica)
+      - Redis: Cache Balance
+    - Integration:
+      - Transaction Service
+      - Ledger Service
+      - Payment Service
+      - Settlement Service
+      - Fraud Detection Service
+  - Ledger Service
+    - Description: บันทึกบัญชีทางการเงินแบบ double-entry ledger เพื่อรักษาความถูกต้องของข้อมูลทางบัญชี
+    - Stack: GoLang
+    - Database: Postgres (AWS RDS | Primary Node (Write), Read Replica)
+    - Integration:
+      - Wallet Service
+      - Transaction Service
+      - Financial Service
+      - Settlement Service
+      - Reconciliation Service
+  - Transaction Service
+    - Description: จัดการ lifecycle ของ transaction เช่น create, processing, success และ failed
+    - Stack: GoLang
+    - Database:
+      - Postgres (AWS RDS | Primary Node (Write), Read Replica)
+      - Redis: Support Case Idempotency Key
+    - Integration:
+      - Wallet Service
+      - Payment Service
+      - Ledger Service
+      - Fraud Detection Service
+      - Transaction History Service
+      - Settlement Service
+  - Transaction History Service
+    - Description: เก็บ transaction history สำหรับ query และ reporting โดย optimized สำหรับ read-heavy workload
+    - Stack: Python (Lampda)
+    - Database: MongoDB (AWS DocumentDB - MongoDB-compatible)
+    - Integration:
+      - Transaction Service
+      - Wallet Service
+      - Financial Service
+  - Settlement Service
+    - Description: จัดการ settlement ระหว่างระบบ เช่น settlement กับธนาคารหรือ merchant
+    - Stack: GoLang
+    - Database:
+      - Postgres (AWS RDS | Primary Node (Write), Read Replica)
+        - ACID
+        - Financial Integrity
+        - Relational Data
+    - Integration:
+      - Payment Service
+      - Ledger Service
+      - Financial Service
+      - Reconciliation Service
+  - Reconciliation Service
+    - Description: ตรวจสอบความถูกต้องของข้อมูล transaction ระหว่างระบบภายในและ external systems
+    - Stack: Python (Lampda)
+    - Database:
+      - Postgres (AWS RDS | Primary Node (Write), Read Replica)
+      - Redis
+    - Integration:
+      - Settlement Service
+      - Ledger Service
+      - Payment Service
+      - Financial Service
+  - Financial Service
+    - Description: จัดการ financial reporting และ accounting related operations
+    - Stack: GoLang
+    - Database: Postgres (AWS RDS | Primary Node (Write), Read Replica)
+    - Integration:
+      - Ledger Service
+      - Settlement Service
+      - Billing Service
+      - Transaction Service
+  - Billing Service
+    - Description: จัดการ billing เช่น service fee, commission และ invoice generation
+    - Stack: GoLang
+    - Database: Postgres (AWS RDS | Primary Node (Write), Read Replica)
+    - Integration:
+      - Payment Service
+      - Financial Service
+      - Transaction Service
+      - Settlement Service
+  - KYC Service
+    - Description: จัดการกระบวนการยืนยันตัวตนของผู้ใช้ เช่น document verification และ KYC status
+    - Stack: GoLang
+    - Database: Postgres (AWS RDS | Primary Node (Write), Read Replica)
+    - Integration:
+      - User Service
+      - Fraud Detection Service
+      - Payment Service
+      - Notification Service
+  - Notification Service
+    - Description: จัดการการส่ง notification เช่น email, SMS และ push notification
+    - Stack: GoLang
+    - Database: MongoDB (AWS DocumentDB - MongoDB-compatible)
+    - Integration:
+      - User Service
+      - Payment Service
+      - Transaction Service
+      - KYC Service
+  - Audit Log Service
+    - Description: เก็บ audit trail ของทุก action ในระบบเพื่อ compliance และ security investigation
+    - Stack: Python (Lampda)
+    - Database:
+      - MongoDB (AWS DocumentDB - MongoDB-compatible)
+      - S3
+    - Integration:
+      - User Service
+      - Payment Service
+      - Transaction Service
+      - KYC Service
+      - Fraud Detection Service
+  - Rate Limiting Service
+    - Description: ควบคุมจำนวน request ต่อ user หรือ IP เพื่อป้องกัน abuse และ DDoS
+    - Stack: Python (Lampda)
+    - Database: Redis
+    - Integration:
+      - API Gateway
+      - User Service
+      - Token Service
+  - Fraud Detection Service
+    - Description: ตรวจจับธุรกรรมที่มีความเสี่ยงหรือพฤติกรรมผิดปกติของผู้ใช้งาน
+    - Stack: Python (Lampda)
+    - Database: Redis
+    - Integration:
+      - Transaction Service
+      - Wallet Service
+      - Payment Service
+      - Device Service
+      - User Service
+- WEB APPLICATION: Next.js
+- CACHE: Redis
+  - Fraud Detection Cache
+  - Wallet Balance Cache
+- ORCHESTRATION: Kubernetes
+- CONTAINERIZATION: Docker
+- SECRETS MANAGER: AWS Secrets Manager
+  - AWS KMS
+- API GATEWAY: Kong
+- LOAD BALANCE: Istio
+  - Service Mesh
+  - Traffic Management
+- MESSAGE QUEUE: Kafka
+- LOGGING & OBSERVABILITY:
+  - METRICS: Prometheus
+  - VISUALIZATION: Grafana
+  - LOGGING: Grafana Loki
+  - TRACING: Jaeger
+  - TELEMETRY: OpenTelemetry
+- DATA WAREHOUSE: AWS Redshift
+
+## CLOUD ARCHITECTURE
