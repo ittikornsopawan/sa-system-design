@@ -74,7 +74,9 @@
 
 - User Service: จัดการข้อมูลผู้ใช้งาน เช่น profile, account status และข้อมูลพื้นฐานของผู้ใช้
   - Stack: GoLang
-  - Database: Postgres (AWS RDS | Primary Node (Write), Read Replica)
+  - Database: 
+    - Postgres (AWS RDS | Primary Node (Write), Read Replica)
+    - AWS S3
   - Integration:
     - OTP Service
     - Device Service
@@ -116,7 +118,9 @@
     - Fraud Detection Service
 - Payment Service: จัดการ payment flow เช่น create payment, authorize payment และ cancel payment
   - Stack: GoLang
-  - Database: Postgres (AWS RDS | Primary Node (Write), Read Replica)
+  - Database:
+    - Postgres (AWS RDS | Primary Node (Write), Read Replica)
+    - AWS S3
   - Integration:
     - Wallet Service
     - Transaction Service
@@ -128,6 +132,7 @@
   - Database:
     - Postgres (AWS RDS | Primary Node (Write), Read Replica)
     - Redis: Cache Balance
+    - AWS S3
   - Integration:
     - Transaction Service
     - Ledger Service
@@ -186,7 +191,9 @@
     - Financial Service
 - Financial Service: จัดการ financial reporting และ accounting related operations
   - Stack: GoLang
-  - Database: Postgres (AWS RDS | Primary Node (Write), Read Replica)
+  - Database:
+    - Postgres (AWS RDS | Primary Node (Write), Read Replica)
+    - AWS S3
   - Integration:
     - Ledger Service
     - Settlement Service
@@ -272,171 +279,7 @@
 
 ระบบถูก deploy บน Amazon Web Services (AWS) โดยแยก Infrastructure ตาม Layer และระบุว่าแต่ละ resource ใช้กับ service ใดในระบบ
 
-```mermaid
-flowchart TB
-
-%% ================= EDGE =================
-
-subgraph EDGE["Edge Layer"]
-
-DNS["[DNS Routing] Route53"]
-CDN["[Static Content Cache] CloudFront"]
-WAF["[Security Filter] AWS WAF"]
-
-end
-
-%% ================= ENTRY =================
-
-subgraph ENTRY["Traffic Entry"]
-
-ALB["[Public Load Balancer] ALB"]
-KONG["[API Gateway] Kong"]
-
-end
-
-%% ================= COMPUTE =================
-
-subgraph EKS["Kubernetes Cluster (EKS)"]
-
-subgraph CORE["Core Transaction Services"]
-
-USER["[User Management] User Service"]
-WALLET["[Wallet Balance] Wallet Service"]
-PAYMENT["[Payment Processing] Payment Service"]
-TX["[Transaction Processing] Transaction Service"]
-LEDGER["[Accounting Ledger] Ledger Service"]
-SETTLE["[Settlement Processing] Settlement Service"]
-
-end
-
-subgraph BUSINESS["Business Services"]
-
-KYC["[Identity Verification] KYC Service"]
-BILL["[Billing / Fee Calculation] Billing Service"]
-FIN["[Financial Reporting] Financial Service"]
-NOTI["[Notification Delivery] Notification Service"]
-
-end
-
-end
-
-%% ================= SERVERLESS =================
-
-subgraph LAMBDA["Serverless Services (Lambda)"]
-
-DEVICE["[Device Tracking] Device Service"]
-OTP["[OTP Verification] OTP Service"]
-RECON["[Transaction Reconciliation] Reconciliation Service"]
-AUDIT["[Audit Logging] Audit Log Service"]
-RATE["[Rate Limiting] Rate Limiting Service"]
-FRAUD["[Fraud Detection] Fraud Detection Service"]
-TXH["[Transaction History Query] Transaction History Service"]
-
-end
-
-%% ================= DATA =================
-
-subgraph DATA["Data Layer"]
-
-subgraph RDS["PostgreSQL (RDS)"]
-
-RDS_CORE["[Core Business Data] Core Database"]
-RDS_FIN["[Financial Records] Financial Database"]
-RDS_COMP["[Compliance / KYC Data] Compliance Database"]
-
-end
-
-REDIS["[In-Memory Cache] Redis"]
-DOCDB["[NoSQL Storage] DocumentDB"]
-S3["[Object Storage] S3"]
-
-end
-
-%% ================= STREAM =================
-
-subgraph STREAM["Event Streaming"]
-
-KAFKA["[Event Bus] Kafka"]
-
-end
-
-%% ================= ANALYTICS =================
-
-subgraph ANALYTICS["Analytics"]
-
-REDSHIFT["[Data Warehouse] Redshift"]
-
-end
-
-%% ================= OBS =================
-
-subgraph OBS["Observability"]
-
-PROM["[Metrics Collector] Prometheus"]
-GRAF["[Monitoring Dashboard] Grafana"]
-LOKI["[Log Aggregation] Loki"]
-JAEGER["[Distributed Tracing] Jaeger"]
-OTEL["[Telemetry Collector] OpenTelemetry"]
-
-end
-
-%% ================= FLOW =================
-
-DNS -->|DNS Resolve| CDN
-CDN -->|HTTP Request| WAF
-WAF -->|Filtered Traffic| ALB
-ALB -->|Forward Request| KONG
-
-KONG -->|API Call| USER
-KONG -->|API Call| WALLET
-KONG -->|API Call| PAYMENT
-KONG -->|API Call| TX
-
-USER -->|User Data| RDS_CORE
-WALLET -->|Wallet Data| RDS_CORE
-PAYMENT -->|Payment Record| RDS_CORE
-TX -->|Transaction Data| RDS_CORE
-
-LEDGER -->|Ledger Entry| RDS_FIN
-SETTLE -->|Settlement Record| RDS_FIN
-FIN -->|Financial Report Data| RDS_FIN
-BILL -->|Billing Data| RDS_FIN
-
-KYC -->|KYC Data| RDS_COMP
-AUDIT -->|Audit Record| RDS_COMP
-
-USER -->|Session Cache| REDIS
-WALLET -->|Balance Cache| REDIS
-TX -->|Idempotency Key| REDIS
-FRAUD -->|Risk Score Cache| REDIS
-
-NOTI -->|Notification Data| DOCDB
-TXH -->|Transaction History| DOCDB
-AUDIT -->|Audit Log| DOCDB
-
-AUDIT -->|Archive Logs| S3
-
-TX -->|Publish Event| KAFKA
-PAYMENT -->|Publish Event| KAFKA
-WALLET -->|Publish Event| KAFKA
-SETTLE -->|Publish Event| KAFKA
-
-KAFKA -->|Consume Event| TXH
-KAFKA -->|Consume Event| NOTI
-KAFKA -->|Consume Event| FRAUD
-
-KAFKA -->|Streaming Data| REDSHIFT
-
-USER -->|Telemetry| OTEL
-PAYMENT -->|Telemetry| OTEL
-TX -->|Telemetry| OTEL
-
-OTEL -->|Metrics| PROM
-PROM -->|Dashboard| GRAF
-
-OTEL -->|Trace Data| JAEGER
-OTEL -->|Logs| LOKI
-```
+![CLOUD ARCHITECTURE](asset/cloud-architecture.drawio.png)
 
 ### Edge Layer
 
