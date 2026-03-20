@@ -182,7 +182,7 @@
     - Financial Service
     - Reconciliation Service
 - Reconciliation Service: ตรวจสอบความถูกต้องของข้อมูล transaction ระหว่างระบบภายในและ external systems
-  - Stack: Python (Lampda)
+  - Stack: GoLang
   - Database:
     - Postgres (AWS RDS | Primary Node (Write), Read Replica)
     - Redis
