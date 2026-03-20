@@ -10,7 +10,7 @@
 
 - Domain Driven-Design (DDD)
 
-  - ใช้เพื่อจัดการระบบที่มีหลาย Business Domain โดยแยกแต่ละ Domain ออกเป็น Bounded Context
+  - ใช้เพื่อจัดการระบบที่มีหลาย Business Domain โดยแยกแต่ละ Domain ออกเป็น Bounded Context (ขอบเขตของ Domain)
   - เพื่อลด Complexity ของ System และป้องกัน Business Logic Overlap (หรือ Cross-domain coupling) ระหว่าง Domain
   - แต่ละ Domain สามารถถูกพัฒนา ดูแล และ deploy แยกกันได้ ทำให้ทีมสามารถมี Service Owner ของแต่ละ Domain ได้อย่างชัดเจน
   - DDD Layers
