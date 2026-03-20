@@ -4,7 +4,9 @@
 
 ### MICROSERVICES ARCHITECTURE
 
-#### CODE STRUCTURE:
+#### CODE STRUCTURE
+
+![CODE STRUCTURE](asset/code-structure.drawio.png)
 
 - Domain Driven-Design (DDD)
 
