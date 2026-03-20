@@ -153,7 +153,7 @@
 - Transaction Service: จัดการ lifecycle ของ transaction เช่น create, processing, success และ failed
   - Stack: GoLang
   - Database:
-    - Postgres (AWS RDS | Primary Node (Write), Read Replica)
+    - MongoDB (AWS DocumentDB - MongoDB-compatible)
     - Redis: Support Case Idempotency Key
   - Integration:
     - Wallet Service
